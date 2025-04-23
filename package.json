@@ -1,27 +1,27 @@
 {
-  "name": "mergesubtitle",
-  "module": "index.ts",
-  "type": "module",
-  "private": true,
-  "bin": {
-    "mergesubtitle": "./dist/index.js"
-  },
-  "scripts": {
-    "production": "bun build --outdir dist --target bun ./src/index.ts",
-    "dev": "bun run --watch ./src/index.ts",
-    "test": "bun test",
-    "lint": "bun run eslint .",
-    "format": "bun run prettier . --write"
-  },
-  "devDependencies": {
-    "@types/bun": "latest"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
-  },
-  "dependencies": {
-    "chardet": "^2.1.0",
-    "commander": "^13.1.0",
-    "iconv-lite": "^0.6.3"
-  }
+	"name": "mergesubtitle",
+	"module": "index.ts",
+	"type": "module",
+	"private": true,
+	"bin": {
+		"mergesubtitle": "./dist/index.js"
+	},
+	"scripts": {
+		"production": "bun build --outdir dist --target bun ./src/index.ts",
+		"dev": "bun run --watch ./src/index.ts",
+		"test": "bun test",
+		"lint": "bun run eslint .",
+		"format": "bun run prettier . --write"
+	},
+	"devDependencies": {
+		"@types/bun": "latest"
+	},
+	"peerDependencies": {
+		"typescript": "^5"
+	},
+	"dependencies": {
+		"chardet": "^2.1.0",
+		"commander": "^13.1.0",
+		"iconv-lite": "^0.6.3"
+	}
 }

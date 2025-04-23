@@ -29,7 +29,7 @@ export function verifySubtitle(filePath: string): boolean {
 	const matches = content.match(timecodePattern);
 	if (!matches || matches.length < 3) {
 		console.warn(
-			`⚠️ Subtitle may be invalid or corrupted: found ${matches?.length || 0} timecodes in ${path}`
+			`⚠️ Subtitle may be invalid or corrupted: found ${matches?.length || 0} timecodes in ${path}`,
 		);
 		return false;
 	}
