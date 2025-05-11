@@ -99,11 +99,13 @@ export class SubtitleProcessor {
 		}
 
 		await this.merge();
-		// Adjust the flags of the copied video file
+
+		//TODO: This needs to be more dynamic and not hardcoded
+		//Adjust the flags of the copied video file
 		const AdjustFlagsInstance = new AdjustFlags({
 			videoPath: this.videoPath,
-			subLang: "Persian",
-			audioLang: "English",
+			subLang: this.subtitleLang,
+			audioLang: this.audioLang,
 		});
 		await AdjustFlagsInstance.adjustFlags();
 		console.log(
@@ -206,10 +208,6 @@ export class SubtitleProcessor {
 
 		try {
 			await this.removeSubtitleByLanguage(this.videoPath, this.subtitleLang);
-			await copyFile(this.videoPath, tempOutput).catch((err) => {
-				console.error("❌ Copying video file failed:", err);
-				throw new Error(`❌ Copying video file failed: ${err.message}`);
-			});
 
 			const cmdArgs = [
 				"-o",
@@ -218,7 +216,7 @@ export class SubtitleProcessor {
 				"--language",
 				`0:${language}`,
 				"--track-name",
-				`0:${subtitleTitle}`,
+				`0:${subtitleTitle} (Forced)`,
 				"--default-track",
 				"0:yes",
 				"--forced-track",

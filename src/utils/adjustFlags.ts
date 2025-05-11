@@ -56,39 +56,37 @@ export class AdjustFlags {
 		const track = metadata.tracks.find((t) => t.properties.uid === uid);
 		return track?.id;
 	}
-	async verifyFlags(trackId: number): Promise<boolean> {
+	async verifyFlags(trackUId: number): Promise<boolean> {
 		try {
 			// Run mkvmerge with -J (JSON output) to get the track details
-			const Output = await execSync(
-				`mkvmerge -J "${this.videoPath}"`,
-			).toString();
+			const Output = await this.getMKVmetadata();
 
 			// Find the track by trackId (we assume you have an array of tracks)
-			const track = JSON.parse(Output).tracks.find(
-				(t: { id: number }) => t.id === trackId,
+			const track = Output.tracks.find(
+				(t: { properties: { uid: number } }) => t.properties.uid === trackUId,
 			);
 
 			if (!track) {
-				console.log(`⚠️ Track with ID ${trackId} not found in the file.`);
+				console.log(`⚠️ Track with ID ${trackUId} not found in the file.`);
 				return false;
 			}
 
 			// Check the flags for the track
-			const isDefaultTrack = track.default_track === true;
-			const isForcedTrack = track.forced_track === true;
+			const isDefaultTrack = track.properties.default_track === true;
+			const isForcedTrack = track.properties.forced_track === true;
 
 			if (isDefaultTrack && isForcedTrack) {
 				console.log(
-					`✅ Flags for track ${color.PINK}${trackId}${color.RESET} are correctly set: default & forced.`,
+					`✅ Flags for track ${color.PINK}${trackUId}${color.RESET} are correctly set as default & forced.`,
 				);
 				return true;
 			}
-			console.log(`⚠️ Flags for track ${trackId} are not correctly set.`);
+			console.log(`⚠️ Flags for track ${trackUId} are not correctly set.`);
 			console.log(`- Default Track: ${isDefaultTrack ? "Yes" : "No"}`);
 			console.log(`- Forced Track: ${isForcedTrack ? "Yes" : "No"}`);
 			return false;
 		} catch (error) {
-			console.error(`❌ Error verifying flags for track ${trackId}: ${error}`);
+			console.error(`❌ Error verifying flags for track ${trackUId}: ${error}`);
 			return false;
 		}
 	}
@@ -177,21 +175,32 @@ export class AdjustFlags {
 				if (!MatchedLang && (isForced || isDefault || nameContainsForced)) {
 					console.log(
 						`‼️ Subtitle Language ${FLN}\n` +
-							`${isForced ? "⚠️ Is set as forced\n" : ""}` +
-							`${isDefault ? "⚠️ Is set as default" : ""}` +
+							`${isForced ? "⚠️ Is set as forced\n" : ""}\n` +
+							`${isDefault ? "⚠️ Is set as default" : ""}\n` +
 							`${nameContainsForced ? "⚠️ Is set as forced in name" : ""}`,
+					);
+					console.log(
+						`Removing ${FLN} from default & forced Subtitle and setting ${color.GREEN}${this.subLang}${color.RESET} as default and forced`,
 					);
 					await this.resetTrackFlags(sub.properties.uid);
 				}
 				if (MatchedLang) {
 					if (!isForced || !isDefault) {
 						await this.setTrackAsDefault(sub.properties.uid);
+						const isSetCorrectly = await this.verifyFlags(sub.properties.uid);
+						if (!isSetCorrectly) {
+							console.log(
+								`⚠️ Failed to set ${color.GREEN}${this.subLang}${color.RESET} as default & forced Subtitle`,
+							);
+							return false;
+						}
 						console.log(
 							`✅ Language ${FLN} is set as default & forced Subtitle`,
 						);
 					}
 				}
 			}
+
 			return true;
 		} catch (error) {
 			console.error(`🚨 Error adjusting subtitle flags: ${error}`);
@@ -205,9 +214,6 @@ export class AdjustFlags {
 				console.log("⚠️ No audio tracks found in the video file.");
 				return false;
 			}
-			// console.log(`🔎 Found ${audioTracks.length} audio tracks:`);
-
-			let defaultSet = false;
 			for (const audio of audioTracks) {
 				const FLN = `${color.GREEN}${this.fullLanguageName(audio.properties.language)}${color.RESET}`;
 				const MatchedLang = this.isLanguageMatch(
@@ -218,12 +224,15 @@ export class AdjustFlags {
 					audio.properties.track_name,
 				);
 
-				const isDefault = audio.properties.default_track;
-				const isForced = audio.properties.forced_track;
+				const isDefault = !!audio.properties.default_track;
+				const isForced = !!audio.properties.forced_track;
 
 				if (isCommentary) {
 					console.log(
-						`⚠️ Language ${FLN} with id: ${audio.id} is commentary Audio and ${isDefault ? "is default" : "is not default"} ${isForced ? "and it is forced" : "and it is not forced"}`,
+						`⚠️ Language ${FLN} ` +
+							`with id: ${audio.id} is commentary Audio. ` +
+							`It ${isDefault ? "is default" : "is not default"} ` +
+							`${isForced ? "and it is forced" : "and it is not forced"}`,
 					);
 				}
 				if (!MatchedLang && (isCommentary || isDefault || isForced)) {
@@ -236,18 +245,16 @@ export class AdjustFlags {
 				if (MatchedLang && !isCommentary) {
 					if (!isDefault || !isForced) {
 						await this.setTrackAsDefault(audio.properties.uid);
-					} else {
-						console.log(
-							`✅ Language ${FLN} is set as default & forced for Audio`,
-						);
+						const isSetCorrectly = await this.verifyFlags(audio.properties.uid);
+						if (!isSetCorrectly) {
+							console.log(
+								`⚠️ Failed to set ${color.GREEN}${this.audioLang}${color.RESET} as default & forced Audio`,
+							);
+							return false;
+						}
+						console.log(`✅ Language ${FLN} is set as default & forced Audio`);
 					}
-					defaultSet = true;
 				}
-			}
-			if (!defaultSet) {
-				console.log(
-					`⚠️ No matching language track found for ${this.audioLang}.`,
-				);
 			}
 			return true;
 		} catch (error) {

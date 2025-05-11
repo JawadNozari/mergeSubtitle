@@ -2,12 +2,11 @@
 
 import { existsSync } from "node:fs";
 import { unlink } from "node:fs/promises";
-import { AdjustFlags } from "./utils/adjustFlags";
-import path, { join, extname, parse, resolve } from "node:path";
-import { SubtitleProcessor } from "./utils/subtitleProcessor";
-import { readdir, readFile, writeFile } from "node:fs/promises";
 import * as color from "./utils/consoleColors";
-import { env } from "node:process";
+import { AdjustFlags } from "./utils/adjustFlags";
+import { SubtitleProcessor } from "./utils/subtitleProcessor";
+import path, { join, extname, parse, resolve } from "node:path";
+import { readdir, readFile, writeFile } from "node:fs/promises";
 
 // Simple CLI args parser
 const args = process.argv.slice(2);
@@ -22,7 +21,16 @@ const commandList = ["adjustFlags", "removeSubtitle"];
 
 const SUB_DIR = getArg("subs", "./");
 const VIDEO_DIR = getArg("videos", "./");
+// get language from args
+const subLang = args.find((arg) => arg.startsWith("--subLang="));
+const audioLang = args.find((arg) => arg.startsWith("--audioLang="));
+if (!subLang || !audioLang)
+	throw new Error(
+		"❌ Language not specified. Use --subLang=<language> --audioLang=<language>",
+	);
 
+const subLanguage = subLang.split("=")[1] || "English";
+const audioLanguage = audioLang.split("=")[1] || "English";
 const Regex_Shows = /^(?<title>.*?)S(?<season>\d{1,2})E(?<episode>\d{2,3}|\d)/i;
 const Regex_Movies = /^(?<title>.+?)(?:\.|_)(?<year>(?:19|20)\d{2})/i;
 
@@ -49,28 +57,18 @@ function extractMeta(filename: string) {
 	return null;
 }
 
-/**
- * Safe rename function that works on exFAT drives
- * This copies the content instead of using the rename operation
- */
 async function safeRename(oldPath: string, newPath: string): Promise<void> {
 	try {
-		// Read the original file
 		const content = await readFile(oldPath);
-
-		// Write to the new location
 		await writeFile(newPath, content);
 
-		// Verify the new file was written correctly
 		if (existsSync(newPath)) {
-			// Only delete the original after successful verification
 			try {
 				await unlink(oldPath);
 			} catch (unlinkError) {
 				console.warn(
 					`Warning: Could not delete original file ${oldPath}. You may want to delete it manually.`,
 				);
-				// We don't throw here, as the operation essentially succeeded
 			}
 		} else {
 			throw new Error(`Failed to verify new file at ${newPath}`);
@@ -89,15 +87,31 @@ async function processSubtitles() {
 	const disableClean = !!args.find((arg) => arg.startsWith("--disableClean"));
 	const keepSubtitle = !!args.find((arg) => arg.startsWith("--keepSubtitle"));
 	console.debug(
-		`🛠️  Options: disableSync=${disableSync}, disableConvert=${disableConvert}, disableClean=${disableClean}, keepSubtitle=${keepSubtitle}`,
+		// biome-ignore lint/style/useTemplate: <explanation>
+		"🛠️  Options:\n" +
+			`subtitle Language= ${color.GREEN}${subLanguage}${color.RESET}\n` +
+			`audio Language=    ${color.GREEN}${audioLanguage}${color.RESET}\n` +
+			`disableSync:       ${color.BLUE}${disableSync}${color.RESET}\n` +
+			`disableConvert=    ${color.BLUE}${disableConvert}${color.RESET}\n` +
+			`disableClean=      ${color.BLUE}${disableClean}${color.RESET}\n` +
+			`keepSubtitle=      ${color.BLUE}${keepSubtitle}${color.RESET}`,
 	);
 	if (command && commandList.includes(command)) {
 		const commands: Record<string, () => Promise<void>> = {
 			async help() {
 				console.log("Available options:");
-				console.log("--convertUtf8: Convert all subtitles to UTF-8");
-				console.log("--merge: Merge subtitles with videos");
-				console.log("--adjustFlags: Adjust flags for video files");
+				console.log(
+					"--adjustFlags: Adjust flags for video files. default Subtitle and Audio language is English",
+				);
+				console.log(
+					"example: mergeSubtitle --adjustFlags --subLang=Persian --audioLang=English",
+				);
+				console.log(
+					"--removeSubtitle: Removes subtitles with a specific language from video files. Must pass --subLang=<language>",
+				);
+				console.log(
+					"example: mergeSubtitle --removeSubtitle --subLang=Persian",
+				);
 			},
 
 			async adjustFlags() {
@@ -107,19 +121,20 @@ async function processSubtitles() {
 
 				for (const file of VideoFiles) {
 					console.log("-".repeat(50));
-					console.log(
-						`🔄 Processing file: ${color.GRAY}${path.basename(file)}${color.RESET}`,
-					);
+
 					const filePath = join(VIDEO_DIR, file);
 					if (
 						extname(file) === ".mkv" &&
 						existsSync(filePath) &&
 						!file.startsWith("._")
 					) {
+						console.log(
+							`🔄 Processing file: ${color.GRAY}${path.basename(file)}${color.RESET}`,
+						);
 						const adjustFlags = new AdjustFlags({
 							videoPath: parse(filePath).base,
-							subLang: "Persian",
-							audioLang: "English",
+							subLang: subLanguage,
+							audioLang: audioLanguage,
 						});
 						await adjustFlags.adjustFlags();
 					}
@@ -129,13 +144,11 @@ async function processSubtitles() {
 
 			async removeSubtitle() {
 				// get language from args
-				const lang = args.find((arg) => arg.startsWith("--lang="));
-				if (!lang) {
-					console.error("❌ Language not specified. Use --lang=<language>");
-					process.exit(1);
-				}
+				const subLang = args.find((arg) => arg.startsWith("--subLang="));
+				if (!subLang)
+					throw new Error("❌ Language not specified. Use --lang=<language>");
 
-				const langName = lang.split("=")[1];
+				const langName = subLang.split("=")[1];
 				const VideoFiles = await readdir(VIDEO_DIR);
 				console.log(
 					`This will remove all subtitles with the language "${langName}" from all video files in ${VIDEO_DIR}`,
@@ -197,7 +210,6 @@ async function processSubtitles() {
 			});
 		return;
 	}
-	console.log("📂 Reading subtitle and video directories...");
 	const subtitleFiles = (await readdir(SUB_DIR))
 		.filter(
 			(f) => extname(f) === ".srt" && !f.startsWith("._") && !f.startsWith("."),
@@ -260,8 +272,6 @@ async function processSubtitles() {
 		const newSubtitlePath = join(SUB_DIR, `${newSubtitleBase}.srt`);
 
 		if (oldSubtitlePath !== newSubtitlePath) {
-			console.log(`✏️  Renaming subtitle: ${sub} → ${newSubtitleBase}.srt`);
-			// Use safe rename instead of the standard rename
 			try {
 				await safeRename(oldSubtitlePath, newSubtitlePath);
 			} catch (error) {
@@ -274,8 +284,8 @@ async function processSubtitles() {
 		const processor = new SubtitleProcessor({
 			videoPath: videoPath,
 			subtitlePath: newSubtitlePath,
-			subtitleLang: "Persian",
-			audioLang: "English",
+			subtitleLang: subLanguage,
+			audioLang: audioLanguage,
 			keepSubtitle: keepSubtitle,
 			shouldConvert: !disableConvert,
 			shouldClean: !disableClean,
