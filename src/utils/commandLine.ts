@@ -1,15 +1,14 @@
-import { Command } from "commander";
 import { spawn } from "node:child_process";
-import { timeStamp } from "node:console";
-export async function runCommand(cmd: string, args: string[]) {
+
+type stdioType = "inherit" | "pipe" | "ignore";
+export async function runCommand(
+	cmd: string,
+	args: string[],
+	stdio: stdioType = "inherit",
+) {
 	return new Promise<void>((resolve, reject) => {
 		const child = spawn(cmd, args, {
-			// stdio: "inherit",
-			stdio: "pipe",
-			// env: {
-			// 	...process.env,
-			// 	PYTHONIOENCODING: "utf-8",
-			// },
+			stdio: stdio,
 		});
 		child.on("close", (code) => {
 			if (code === 0) resolve();
@@ -17,7 +16,7 @@ export async function runCommand(cmd: string, args: string[]) {
 		});
 		child.on("error", (error) => {
 			console.error(
-				`[${getCurrentTimestamp()}]-runCommand: Command "${cmd}" error: ${error}`,
+				`[${getCurrentTimestamp()}] Command ${cmd} error: ${error}`,
 			);
 			reject(
 				new Error(`Catched Error when running command "${cmd}": ${error}`),
@@ -26,18 +25,18 @@ export async function runCommand(cmd: string, args: string[]) {
 		child.on("exit", (code) => {
 			if (code !== 0) {
 				console.error(
-					`[${getCurrentTimestamp()}]-runCommand: Command "${cmd}" exited with code ${code}`,
+					`[${getCurrentTimestamp()}] Command ${cmd} exited with code ${code}`,
 				);
 				reject(new Error(`Command "${cmd}" exited with code ${code}`));
 			}
 			if (code === 0) resolve();
 		});
 		child.on("disconnect", () => {
-			console.error(
-				`[${getCurrentTimestamp()}]-runCommand: Command "${cmd}" disconnected`,
-			);
+			console.error(`[${getCurrentTimestamp()}] Command "${cmd}" disconnected`);
 			reject(new Error(`Command "${cmd}" disconnected`));
 		});
+
+		// reject(new Error(`Command "${cmd}" failed to start`));
 		// child.on("message", (message) => {
 		// 	console.log(
 		// 		`[${getCurrentTimestamp()}]-runCommand: Command "${cmd}" message: ${message}`,

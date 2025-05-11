@@ -1,0 +1,14 @@
+export const RED = "\u001b[31m";
+export const BOLD = "\u001b[1m";
+export const RESET = "\u001b[0m";
+export const BLUE = "\u001b[34m";
+export const PINK = "\u001b[38;5;201m";
+export const WHITE_CYAN = "\u001b[37;46m";
+export const RED_YELLOW = "\u001b[31;43m";
+export const LAVENDER = "\u001b[38;5;147m";
+export const AQUA = "\u001b[38;2;145;231;255m";
+export const PENCIL = "\u001b[38;2;253;182;0m";
+export const YELLOW = "\u001b[33m";
+export const GREEN = "\u001b[32m";
+export const ORANGE = "\u001b[38;2;255;165;0m";
+export const GRAY = "\u001b[38;2;173;216;230m";
